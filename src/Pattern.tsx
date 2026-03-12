@@ -7,7 +7,7 @@ interface IPattern {
   spacing: number;
   padding: number;
   preview: boolean;
-  shape: "circle" | "square" | "cross";
+  shape: "circle" | "square" | "cross" | "star";
   invert: boolean;
   toggleCell?: (i: number, j: number, val: 0 | 1 | -1) => void;
   setSelected?: ({ row, col }: { row: number; col: number }) => void;

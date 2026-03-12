@@ -37,7 +37,8 @@ select {
   width: 5rem;
 }
 
-input[type="text"] {
+input[type="text"],
+textarea {
   width: 100%;
 }
 

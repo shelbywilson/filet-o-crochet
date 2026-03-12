@@ -8,7 +8,7 @@ interface ICell {
   spacing: number;
   preview: boolean;
   invert: boolean;
-  shape: "circle" | "square" | "cross";
+  shape: "circle" | "square" | "cross" | "star";
   toggleCell?: (i: number, j: number, val: 0 | 1 | -1) => void;
   setSelected?: ({ row, col }: { row: number; col: number }) => void;
 }
@@ -72,6 +72,27 @@ export default function Cell({
     );
   };
 
+  const getStar = (filled: boolean) => {
+    const outerR = (1 - spacing) / 2;
+    const innerR = outerR * 0.389;
+    const parts: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      const angle = (i * Math.PI) / 5 - Math.PI / 2;
+      const r = i % 2 === 0 ? outerR : innerR;
+      parts.push(`${i === 0 ? "M" : "L"} ${0.5 + r * Math.cos(angle)} ${0.5 + r * Math.sin(angle)}`);
+    }
+    const d = parts.join(" ") + " Z";
+    return (
+      <path
+        d={d}
+        transform={`translate(${colIndex * cellSize}, ${rowIndex * cellSize}) scale(${cellSize})`}
+        fill={filled ? (cell == 1 ? "#fff" : "rgb(40, 40, 40)") : "rgba(0,0,0,0)"}
+        stroke={filled ? "none" : "red"}
+        strokeWidth={filled ? 0 : 1 / cellSize}
+      />
+    );
+  };
+
   useEffect(() => {
     const cb = (event: Event) => {
       event.preventDefault();
@@ -96,6 +117,8 @@ export default function Cell({
                 />
               ) : shape == "cross" ? (
                 getCross()
+              ) : shape == "star" ? (
+                getStar(true)
               ) : (
                 <rect
                   x={
@@ -129,6 +152,8 @@ export default function Cell({
             </>
           ) : shape == "cross" ? (
             getCross()
+          ) : shape == "star" ? (
+            cell == 0 ? getStar(false) : <></>
           ) : cell == 0 ? (
             shape == "circle" ? (
               <circle

@@ -9,10 +9,11 @@ import {
 } from "./util/border";
 import { generatePerlinGrid } from "./util/perlin";
 import { patterns } from "./patterns";
-import { alpha } from "./alphabet";
+import { fonts, FontKey } from "./fonts";
 import { Download } from "./Download";
 import { GridSize } from "./controls/GridSize";
 import Pattern from "./Pattern";
+import PatternCanvas from "./PatternCanvas";
 
 export default function App() {
   const [cellSize, setCellSize] = useState(20);
@@ -26,14 +27,15 @@ export default function App() {
   const [padding, setPadding] = useState(0.1);
   const [spacingMode, setSpacingMode] = useState("percent");
   const [preview, setPreview] = useState(true);
-  const [shape, setShape] = useState<"square" | "circle" | "cross">("square");
+  const [shape, setShape] = useState<"square" | "circle" | "cross" | "star">("square");
   const [invert, setInvert] = useState(false);
   const [symmetry, setSymmetry] = useState({ x: false, y: false, z: false, rotate90: false, rotate180: false });
+  const [font, setFont] = useState<FontKey>("font-1");
 
   const spacingPixels = spacing * cellSize;
   const spacingPercent = spacing;
 
-  const toggleCell = (row, col, val) => {
+  const toggleCell = (row: number, col: number, val: 0 | 1 | -1) => {
     setGrid((prev) => {
       const newGrid = prev.map((r) => [...r]);
       const rows = newGrid.length;
@@ -144,15 +146,12 @@ export default function App() {
 
   console.log(grid);
 
-  function handleText(e) {
-    const drafts = (e.target.value || " ").split("").map((letter) =>
-      alpha[letter]
-        ? alpha[letter]
-        : [
-            [0, 0],
-            [0, 0],
-            [0, 0],
-          ],
+  function lineToGrid(line: string): number[][] {
+    const alpha = fonts[font];
+    const drafts = (line || " ").split("").map((letter) =>
+      alpha[letter as keyof typeof alpha]
+        ? alpha[letter as keyof typeof alpha]
+        : [[0, 0], [0, 0], [0, 0]],
     );
 
     const maxHeight = Math.max(...drafts.map((arr) => arr.length));
@@ -170,24 +169,50 @@ export default function App() {
       return padded;
     });
 
-    const joined = paddedDrafts[0].map((_, rowIndex) =>
+    return paddedDrafts[0].map((_, rowIndex) =>
       paddedDrafts.flatMap((draft) => draft[rowIndex]),
     );
+  }
 
-    setGrid(joined);
+  function handleText(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const lines = (e.target.value || " ").split("\n");
+    const lineGrids = lines.map((line) => lineToGrid(line));
+
+    const maxWidth = Math.max(...lineGrids.map((g) => g[0]?.length || 0));
+    const paddedLineGrids = lineGrids.map((g) =>
+      g.map((row) => [...row, ...Array(maxWidth - row.length).fill(0)]),
+    );
+
+    const result: number[][] = [];
+    for (let i = 0; i < paddedLineGrids.length; i++) {
+      result.push(...paddedLineGrids[i]);
+      if (i < paddedLineGrids.length - 1) {
+        result.push(Array(maxWidth).fill(0));
+      }
+    }
+
+    setGrid(result);
   }
 
   return (
     <div className={`${preview ? "preview" : ""} container`}>
       <div className="controls">
         <div>
-          <input type="text" onChange={handleText} />
+          <textarea rows={3} onChange={handleText} />
+          <label>
+            <span>font</span>
+            <select value={font} onChange={(e) => setFont(e.target.value as FontKey)}>
+              {Object.keys(fonts).map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+          </label>
         </div>
         <div>
           <label>
             <span>presets</span>
             <div>
-              <select onChange={(e) => setGrid(patterns[e.target.value])}>
+              <select onChange={(e) => setGrid(patterns[e.target.value as keyof typeof patterns])}>
                 {Object.keys(patterns).map((pattern) => (
                   <option key={pattern} value={pattern}>
                     {pattern}
@@ -240,9 +265,9 @@ export default function App() {
                 <div>
                   <select
                     value={shape}
-                    onChange={(e) => setShape(e.target.value)}
+                    onChange={(e) => setShape(e.target.value as "square" | "circle" | "cross" | "star")}
                   >
-                    {["square", "circle", "cross"].map((shape) => (
+                    {["square", "circle", "cross", "star"].map((shape) => (
                       <option key={shape} value={shape}>
                         {shape}
                       </option>
@@ -381,7 +406,7 @@ export default function App() {
         </div>
         <div>
           <label>
-            <span>padding</span>
+            <span>border</span>
             <input
               type="range"
               min="0"
@@ -450,9 +475,9 @@ export default function App() {
             Circle
           </button>
 
-          <button onClick={() => setGrid(destroyEdges(grid))} role="button">
+          {/* <button onClick={() => setGrid(destroyEdges(grid))} role="button">
             Destroy edges
-          </button>
+          </button> */}
 
           <button onClick={() => setGrid(shift(grid))} role="button">
             Shift
@@ -468,6 +493,7 @@ export default function App() {
               grid={grid}
               cellSize={cellSize}
               spacing={spacing}
+              padding={padding}
               invert={invert}
               shape={shape}
               preview={false}
@@ -476,7 +502,7 @@ export default function App() {
         </div>
       </div>
       <div>
-        <Pattern
+        <PatternCanvas
           grid={grid}
           cellSize={cellSize}
           spacing={spacing}

@@ -1,4 +1,4 @@
-export const alpha = {
+export const alpha1 = {
   A: [
     [0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0],
