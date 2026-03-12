@@ -1,0 +1,154 @@
+:root {
+  font-family: sans-serif;
+  color: #fff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: rgb(40, 40, 40);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+label > span {
+  flex: 6.5rem 0 0;
+  padding: 0.5rem;
+  align-items: center;
+}
+
+input[type="checkbox"] {
+  width: 1rem;
+}
+
+input[type="range"] {
+  width: 8rem;
+}
+input[type="number"],
+select {
+  width: 5rem;
+}
+
+input[type="text"] {
+  width: 100%;
+}
+
+button {
+  cursor: pointer;
+  padding: 0.375rem;
+  border: 1px solid #ccc;
+  background: #f5f5f5;
+  border-radius: 0;
+  margin: 0.5rem;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+button:hover {
+  background: orange;
+}
+
+button:active {
+  background: #d0d0d0;
+}
+
+.hover:hover {
+  fill: yellow;
+}
+
+.container {
+  padding: 2rem 1rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr 4fr;
+}
+
+svg {
+  display: block;
+  margin: 0 auto;
+  width: 100%;
+}
+svg g {
+  cursor: pointer;
+}
+
+.hover {
+  opacity: 0;
+}
+
+svg:hover .hover {
+  opacity: 1;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid orangered;
+  border-bottom: none;
+}
+
+.controls > div {
+  padding: 0.5rem;
+  border: 1px solid orangered;
+  border-top: none;
+}
+
+.grid-size-container {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  padding: 0.5rem;
+}
+
+.grid-size-container button {
+  aspect-ratio: 1;
+  width: 1.25rem;
+  font-size: 1rem;
+  padding: 0;
+  margin: 0;
+}
+.col-controls,
+.row-controls {
+  gap: 0.5rem;
+}
+
+.col-controls {
+  display: flex;
+  align-items: center;
+  grid-column: 2;
+}
+
+.col-controls-buttons,
+.row-controls-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+}
+
+.row-controls-buttons {
+  flex-direction: column;
+  width: min-content;
+}
+
+.row-controls {
+  width: min-content;
+  justify-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.col-value,
+.row-value {
+  height: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
