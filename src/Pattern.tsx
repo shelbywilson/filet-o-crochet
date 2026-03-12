@@ -1,6 +1,20 @@
 import Cell from "./Cell";
 import { addBorderPath } from "./util/border";
 
+interface IPattern {
+  grid: number[][];
+  cellSize: number;
+  spacing: number;
+  padding: number;
+  preview: boolean;
+  shape: "circle" | "square" | "cross";
+  invert: boolean;
+  toggleCell?: (i: number, j: number, val: 0 | 1 | -1) => void;
+  setSelected?: ({ row, col }: { row: number; col: number }) => void;
+  selected?: { row: number; col: number } | null;
+  symmetry?: { x?: boolean; y?: boolean; z?: boolean; rotate90?: boolean; rotate180?: boolean } | null;
+}
+
 export default function Pattern({
   grid,
   cellSize,
@@ -13,7 +27,7 @@ export default function Pattern({
   setSelected,
   selected,
   symmetry,
-}) {
+}: IPattern) {
   const rows = grid.length || 0;
   const cols = grid[0]?.length || 0;
   const isDownload = !setSelected;
@@ -57,8 +71,8 @@ export default function Pattern({
           shape-rendering="crispEdges"
           vector-effect="non-scaling-stroke"
         ></path>
-        {grid.map((row, rowIndex) =>
-          row.map((cell, colIndex) => (
+        {grid.map((row: number[], rowIndex: number) =>
+          row.map((cell: number, colIndex: number) => (
             <Cell
               key={`${rowIndex}-${colIndex}`}
               rowIndex={rowIndex}
@@ -89,7 +103,7 @@ export default function Pattern({
         ) : (
           <></>
         )}
-        {symmetry && selected.row !== null && selected.col !== null ? (
+        {symmetry && selected && selected.row !== null && selected.col !== null ? (
           <>
             {/* Horizontal reflection (x-axis) */}
             {symmetry.x && (

@@ -73,7 +73,7 @@ export default function Cell({
   };
 
   useEffect(() => {
-    const cb = (event) => {
+    const cb = (event: Event) => {
       event.preventDefault();
     };
     window.addEventListener("contextmenu", cb);
