@@ -215,16 +215,18 @@ export function trimArrayWithBorder(
   return result;
 }
 
-export function addBorderPath(grid, spacing, cellSize, padding = 0.1) {
+export function addBorderPath(grid: number[][], spacing: number, cellSize: number, padding = 0.1) {
   const edges = collectEdges(grid);
   return edgesToPath(edges, cellSize, spacing, padding);
 }
 
-function isInside(value) {
+function isInside(value: number) {
   return value >= 0;
 }
 
-function collectEdges(grid) {
+type Edge = { points: number[][]; normal: number[] };
+
+function collectEdges(grid: number[][]): Edge[] {
   const rows = grid.length;
   const cols = grid[0].length;
   const edges = [];
@@ -275,18 +277,19 @@ function collectEdges(grid) {
   return edges;
 }
 
-function edgesToPath(edges, cellSize, spacing, padding = 0.1) {
+function edgesToPath(edges: Edge[], cellSize: number, _spacing: number, padding = 0.1) {
   if (!edges.length) return "";
 
-  const orderedEdges = [];
+  const orderedEdges: Edge[] = [];
   const firstEdge = edges.shift();
+  if (!firstEdge) return "";
   orderedEdges.push(firstEdge);
 
   let currentEnd = firstEdge.points[1];
 
   while (edges.length > 0) {
     const idx = edges.findIndex(
-      (e) =>
+      (e: Edge) =>
         (e.points[0][0] === currentEnd[0] &&
           e.points[0][1] === currentEnd[1]) ||
         (e.points[1][0] === currentEnd[0] && e.points[1][1] === currentEnd[1])
@@ -311,9 +314,8 @@ function edgesToPath(edges, cellSize, spacing, padding = 0.1) {
   const numEdges = orderedEdges.length;
 
   for (let i = 0; i < numEdges; i++) {
-    const prevEdge = orderedEdges[(i - 1 + numEdges) % numEdges];
-    const currEdge = orderedEdges[i];
-    const nextEdge = orderedEdges[(i + 1) % numEdges];
+    const prevEdge = orderedEdges[(i - 1 + numEdges) % numEdges]!;
+    const currEdge = orderedEdges[i]!;
 
     const cornerPoint = currEdge.points[0];
     const prevNormal = prevEdge.normal;
@@ -337,7 +339,7 @@ function edgesToPath(edges, cellSize, spacing, padding = 0.1) {
   return path.join(" ");
 }
 
-function calculateCornerPoint(point, normal1, normal2, padding) {
+function calculateCornerPoint(point: number[], normal1: number[], normal2: number[], padding: number) {
   if (padding === 0) return point;
 
   const [x, y] = point;
@@ -449,12 +451,12 @@ export function trimArrayWithBorderCircular(
   return result;
 }
 
-export function destroyEdges(grid) {
-  return grid.map((row, j) => {
+export function destroyEdges(grid: number[][]) {
+  return grid.map((row: number[], _j: number) => {
     const l = Math.floor((Math.random() * row.length) / 2);
     const r = row.length - Math.floor((Math.random() * row.length) / 2);
 
-    return row.map((cell, i) => {
+    return row.map((cell: number, i: number) => {
       if (i < l || i > r) {
         return -1;
       }
@@ -466,8 +468,8 @@ export function destroyEdges(grid) {
   });
 }
 
-export function shift(grid) {
-  return grid.map((row) => {
+export function shift(grid: number[][]) {
+  return grid.map((row: number[]) => {
     const x = Math.floor(Math.random() * 3);
 
     // Shift left: move first x elements to the end
@@ -478,7 +480,7 @@ export function shift(grid) {
   });
 }
 
-export function addSimpleBorder(grid) {
+export function addSimpleBorder(grid: number[][]) {
   if (!grid || grid.length === 0) return grid;
 
   const height = grid.length;
