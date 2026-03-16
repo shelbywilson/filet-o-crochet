@@ -193,11 +193,7 @@ export default function PatternCanvas({
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { row, col } = getCellCoords(e);
     if (row < 0 || row >= rows || col < 0 || col >= cols) return;
-    let cell = grid[row][col];
-    if (invert) {
-      if (cell === 0) cell = 1;
-      else if (cell === 1) cell = 0;
-    }
+    const cell = grid[row][col];
     toggleCell(row, col, e.button === 2 ? -1 : cell === 0 ? 1 : 0);
   };
 
