@@ -12,7 +12,7 @@ interface IPattern {
   toggleCell?: (i: number, j: number, val: 0 | 1 | -1) => void;
   setSelected?: ({ row, col }: { row: number; col: number }) => void;
   selected?: { row: number; col: number } | null;
-  symmetry?: { x?: boolean; y?: boolean; z?: boolean; rotate90?: boolean; rotate180?: boolean } | null;
+  symmetry?: { x?: boolean; y?: boolean; rotate90?: boolean; rotate180?: boolean } | null;
 }
 
 export default function Pattern({
@@ -136,7 +136,7 @@ export default function Pattern({
             )}
 
             {/* Diagonal reflection or both x and y */}
-            {((symmetry.x && symmetry.y) || symmetry.z) && (
+            {(symmetry.x && symmetry.y) && (
               <rect
                 x={(grid[0]?.length - selected.col - 1) * cellSize}
                 y={(grid.length - selected.row - 1) * cellSize}

@@ -1,151 +1,231 @@
-import { useState, useEffect } from "react";
-import {
-  trimArrayWithBorder,
-  trimArrayWithBorderRectangular,
-  trimArrayWithBorderCircular,
-  destroyEdges,
-  shift,
-  addSimpleBorder,
-} from "./util/border";
-import { generatePerlinGrid } from "./util/perlin";
-import { patterns } from "./patterns";
+import { useState, useMemo, useRef, useCallback } from "react";
+import { composeParts, composeShape } from "./util/compose";
 import { fonts, FontKey } from "./fonts";
-import { Download } from "./Download";
-import { GridSize } from "./controls/GridSize";
-import Pattern from "./Pattern";
+import { patterns } from "./patterns";
+import { Part } from "./types";
+import { Controls } from "./controls/Controls";
+import { Toggle } from "./controls/Toggle";
 import PatternCanvas from "./PatternCanvas";
+
+function makeId() {
+  return Math.random().toString(36).slice(2);
+}
+
+function makePart(overrides: Partial<Part> & { grid: number[][] }): Part {
+  return {
+    id: makeId(),
+    name: "layer",
+    source: "draw",
+    offsetRow: 0,
+    offsetCol: 0,
+    ...overrides,
+  };
+}
+
+const initialPart = makePart({
+  name: "butterfly",
+  source: "preset",
+  grid: patterns["butterfly-1"]!,
+});
 
 export default function App() {
   const [cellSize, setCellSize] = useState(20);
-
-  const [grid, setGrid] = useState(() => patterns["butterfly-1"]);
-
-  const [rows, setRows] = useState(grid.length);
-  const [cols, setCols] = useState(grid[0]?.length);
+  const [parts, setParts] = useState<Part[]>([initialPart]);
+  const [activePartId, setActivePartId] = useState<string>(initialPart.id);
   const [selected, setSelected] = useState({ row: 0, col: 0 });
   const [spacing, setSpacing] = useState(0.1);
   const [padding, setPadding] = useState(0.1);
-  const [spacingMode, setSpacingMode] = useState("percent");
+  const [spacingMode, setSpacingMode] = useState("pixels");
   const [preview, setPreview] = useState(true);
   const [shape, setShape] = useState<"square" | "circle" | "cross" | "star">("square");
   const [invert, setInvert] = useState(false);
-  const [symmetry, setSymmetry] = useState({ x: false, y: false, z: false, rotate90: false, rotate180: false });
+  const [symmetry, setSymmetry] = useState({
+    x: false,
+    y: false,
+    rotate90: false,
+    rotate180: false,
+  });
   const [font, setFont] = useState<FontKey>("font-1");
+  const [showNumbers, setShowNumbers] = useState(false);
+  const [mode, setMode] = useState<"draw" | "move">("draw");
 
-  const spacingPixels = spacing * cellSize;
-  const spacingPercent = spacing;
+  // --- Derived ---
+  const activePart = parts.find((p) => p.id === activePartId) ?? parts[0];
 
-  const toggleCell = (row: number, col: number, val: 0 | 1 | -1) => {
-    setGrid((prev) => {
-      const newGrid = prev.map((r) => [...r]);
-      const rows = newGrid.length;
-      const cols = newGrid[0].length;
+  const canvasRows = useMemo(
+    () => Math.max(...parts.map((p) => p.offsetRow + p.grid.length)),
+    [parts],
+  );
+  const canvasCols = useMemo(
+    () => Math.max(...parts.map((p) => p.offsetCol + (p.grid[0]?.length ?? 0))),
+    [parts],
+  );
 
-      // Set the primary cell
-      newGrid[row][col] = val;
+  const composedGrid = useMemo(
+    () => composeParts(parts, canvasRows, canvasCols),
+    [parts, canvasRows, canvasCols],
+  );
 
-      // Reflective symmetry (existing)
-      if (symmetry.y) {
-        newGrid[row][cols - col - 1] = val;
-      }
+  const composedShape = useMemo(
+    () => composeShape(parts, canvasRows, canvasCols),
+    [parts, canvasRows, canvasCols],
+  );
 
-      if (symmetry.x) {
-        newGrid[rows - row - 1][col] = val;
-      }
+  // --- History ---
+  const partsRef = useRef(parts);
+  partsRef.current = parts;
+  const activePartIdRef = useRef(activePartId);
+  activePartIdRef.current = activePartId;
+  const drawPartIdRef = useRef<string | null>(null);
 
-      if ((symmetry.x && symmetry.y) || symmetry.z) {
-        newGrid[rows - row - 1][cols - col - 1] = val;
-      }
+  type Snapshot = { parts: Part[]; activePartId: string };
+  const history = useRef<Snapshot[]>([{ parts, activePartId }]);
+  const [historyIndex, setHistoryIndex] = useState(0);
 
-      // Rotational symmetry (90°, 180°, 270°)
-      if (symmetry.rotate90 && rows === cols) {
-        // 90° clockwise: (row, col) -> (col, rows - row - 1)
-        newGrid[col][rows - row - 1] = val;
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.current.length - 1;
 
-        // 180°: (row, col) -> (rows - row - 1, cols - col - 1)
-        newGrid[rows - row - 1][cols - col - 1] = val;
+  const pushHistory = useCallback(() => {
+    const snapshot: Snapshot = {
+      parts: partsRef.current.map((p) => ({ ...p, grid: p.grid.map((r) => [...r]) })),
+      activePartId: activePartIdRef.current,
+    };
+    history.current = history.current.slice(0, historyIndex + 1);
+    history.current.push(snapshot);
+    setHistoryIndex(history.current.length - 1);
+  }, [historyIndex]);
 
-        // 270° clockwise: (row, col) -> (rows - col - 1, row)
-        newGrid[rows - col - 1][row] = val;
-      }
+  const undo = useCallback(() => {
+    if (historyIndex <= 0) return;
+    const next = historyIndex - 1;
+    setHistoryIndex(next);
+    setParts(history.current[next].parts);
+    setActivePartId(history.current[next].activePartId);
+  }, [historyIndex]);
 
-      // Rotational symmetry (180° only)
-      if (symmetry.rotate180) {
-        newGrid[rows - row - 1][cols - col - 1] = val;
-      }
+  const redo = useCallback(() => {
+    if (historyIndex >= history.current.length - 1) return;
+    const next = historyIndex + 1;
+    setHistoryIndex(next);
+    setParts(history.current[next].parts);
+    setActivePartId(history.current[next].activePartId);
+  }, [historyIndex]);
 
-      return newGrid;
-    });
-  };
+  // --- Part operations ---
+  const updateCanvas = useCallback(
+    (transform: (grid: number[][]) => number[][]) => {
+      pushHistory();
+      const newGrid = transform(composedGrid);
+      const newPart = makePart({ name: "canvas", source: "draw", grid: newGrid });
+      setParts([newPart]);
+      setActivePartId(newPart.id);
+    },
+    [pushHistory, composedGrid],
+  );
 
-  useEffect(() => {
-    if (rows != grid.length || cols != grid[0].length) {
-      setGrid((prev) => {
-        const newGrid = Array(rows)
-          .fill(null)
-          .map((_, rowIndex) =>
-            Array(cols)
-              .fill(null)
-              .map((_, colIndex) => {
-                if (rowIndex < prev.length && colIndex < prev[0].length) {
-                  return prev[rowIndex][colIndex];
-                }
-                return 0;
-              }),
-          );
-        return newGrid;
+  const updateActivePart = useCallback(
+    (newGrid: number[][] | ((prev: number[][]) => number[][])) => {
+      pushHistory();
+      setParts((prevParts) =>
+        prevParts.map((part) => {
+          if (part.id !== activePartId) return part;
+          const resolved =
+            typeof newGrid === "function" ? newGrid(part.grid) : newGrid;
+          return { ...part, grid: resolved };
+        }),
+      );
+    },
+    [pushHistory, activePartId],
+  );
+
+  const addPart = useCallback(
+    (partData: Omit<Part, "id">) => {
+      pushHistory();
+      const newPart: Part = { ...partData, id: makeId() };
+      setParts((prev) => [...prev, newPart]);
+      setActivePartId(newPart.id);
+    },
+    [pushHistory],
+  );
+
+  const removePart = useCallback(
+    (id: string) => {
+      pushHistory();
+      setParts((prev) => {
+        const next = prev.filter((p) => p.id !== id);
+        if (activePartId === id && next.length > 0) {
+          setActivePartId(next[next.length - 1].id);
+        }
+        return next.length > 0 ? next : prev; // always keep at least one
       });
-    }
-  }, [rows, cols]);
+    },
+    [pushHistory, activePartId],
+  );
 
-  // useEffect(() => {
-  //   const handleKeyDown = (e) => {
-  //     let newRow = selected.row;
-  //     let newCol = selected.col;
+  const movePart = useCallback((id: string, offsetRow: number, offsetCol: number) => {
+    setParts((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, offsetRow, offsetCol } : p)),
+    );
+  }, []);
 
-  //     switch (e.key) {
-  //       case "ArrowUp":
-  //         e.preventDefault();
-  //         newRow = Math.max(0, selected.row - 1);
-  //         break;
-  //       case "ArrowDown":
-  //         e.preventDefault();
-  //         newRow = Math.min(rows - 1, selected.row + 1);
-  //         break;
-  //       case "ArrowLeft":
-  //         e.preventDefault();
-  //         newCol = Math.max(0, selected.col - 1);
-  //         break;
-  //       case "ArrowRight":
-  //         e.preventDefault();
-  //         newCol = Math.min(cols - 1, selected.col + 1);
-  //         break;
-  //       case "Enter":
-  //         e.preventDefault();
-  //         toggleCell(selected.row, selected.col);
-  //         return;
-  //       default:
-  //         return;
-  //     }
+  const renamePart = useCallback((id: string, name: string) => {
+    setParts((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)));
+  }, []);
 
-  //     setSelected({ row: newRow, col: newCol });
-  //   };
+  const flipPartH = useCallback((id: string) => {
+    pushHistory();
+    setParts((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, grid: p.grid.map((row) => [...row].reverse()) } : p)),
+    );
+  }, [pushHistory]);
 
-  //   window.addEventListener("keydown", handleKeyDown);
-  //   return () => window.removeEventListener("keydown", handleKeyDown);
-  // }, [selected]);
+  const flipPartV = useCallback((id: string) => {
+    pushHistory();
+    setParts((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, grid: [...p.grid].reverse() } : p)),
+    );
+  }, [pushHistory]);
 
-  useEffect(() => {
-    if (rows != grid.length) {
-      setRows(grid.length);
-    }
-    if (cols != grid[0]?.length) {
-      setCols(grid[0]?.length);
-    }
-  }, [grid]);
+  // --- Cell toggling ---
+  const toggleCell = useCallback(
+    (canvasRow: number, canvasCol: number, val: 0 | 1 | -1) => {
+      setParts((prevParts) => {
+        const part = prevParts.find((p) => p.id === activePartId);
+        if (!part) return prevParts;
 
-  console.log(grid);
+        const localRow = canvasRow - part.offsetRow;
+        const localCol = canvasCol - part.offsetCol;
+        const pRows = part.grid.length;
+        const pCols = part.grid[0]?.length ?? 0;
 
+        if (localRow < 0 || localRow >= pRows || localCol < 0 || localCol >= pCols)
+          return prevParts;
+
+        return prevParts.map((p) => {
+          if (p.id !== activePartId) return p;
+          const newGrid = p.grid.map((r) => [...r]);
+
+          newGrid[localRow][localCol] = val;
+          if (symmetry.y) newGrid[localRow][pCols - localCol - 1] = val;
+          if (symmetry.x) newGrid[pRows - localRow - 1][localCol] = val;
+          if (symmetry.x && symmetry.y)
+            newGrid[pRows - localRow - 1][pCols - localCol - 1] = val;
+          if (symmetry.rotate90 && pRows === pCols) {
+            newGrid[localCol][pRows - localRow - 1] = val;
+            newGrid[pRows - localRow - 1][pCols - localCol - 1] = val;
+            newGrid[pRows - localCol - 1][localRow] = val;
+          }
+          if (symmetry.rotate180)
+            newGrid[pRows - localRow - 1][pCols - localCol - 1] = val;
+
+          return { ...p, grid: newGrid };
+        });
+      });
+    },
+    [activePartId, symmetry],
+  );
+
+  // --- Text input ---
   function lineToGrid(line: string): number[][] {
     const alpha = fonts[font];
     const drafts = (line || " ").split("").map((letter) =>
@@ -153,357 +233,70 @@ export default function App() {
         ? alpha[letter as keyof typeof alpha]
         : [[0, 0], [0, 0], [0, 0]],
     );
-
     const maxHeight = Math.max(...drafts.map((arr) => arr.length));
-
     const paddedDrafts = drafts.map((arr, index) => {
       const diff = maxHeight - arr.length;
-      const padding = Array(diff)
-        .fill(null)
-        .map(() => Array(arr[0].length).fill(0));
+      const padding = Array(diff).fill(null).map(() => Array(arr[0].length).fill(0));
       const padded = [...arr, ...padding];
-
-      if (index > 0) {
-        return padded.map((row) => row.slice(1));
-      }
-      return padded;
+      return index > 0 ? padded.map((row) => row.slice(1)) : padded;
     });
-
     return paddedDrafts[0].map((_, rowIndex) =>
       paddedDrafts.flatMap((draft) => draft[rowIndex]),
     );
   }
 
-  function handleText(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const lines = (e.target.value || " ").split("\n");
+  function textToGrid(text: string): number[][] {
+    const lines = (text || " ").split("\n");
     const lineGrids = lines.map((line) => lineToGrid(line));
-
     const maxWidth = Math.max(...lineGrids.map((g) => g[0]?.length || 0));
     const paddedLineGrids = lineGrids.map((g) =>
       g.map((row) => [...row, ...Array(maxWidth - row.length).fill(0)]),
     );
-
     const result: number[][] = [];
     for (let i = 0; i < paddedLineGrids.length; i++) {
       result.push(...paddedLineGrids[i]);
-      if (i < paddedLineGrids.length - 1) {
-        result.push(Array(maxWidth).fill(0));
-      }
+      if (i < paddedLineGrids.length - 1) result.push(Array(maxWidth).fill(0));
     }
-
-    setGrid(result);
+    return result;
   }
 
   return (
     <div className={`${preview ? "preview" : ""} container`}>
-      <div className="controls">
-        <div>
-          <textarea rows={3} onChange={handleText} />
-          <label>
-            <span>font</span>
-            <select value={font} onChange={(e) => setFont(e.target.value as FontKey)}>
-              {Object.keys(fonts).map((f) => (
-                <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div>
-          <label>
-            <span>presets</span>
-            <div>
-              <select onChange={(e) => setGrid(patterns[e.target.value as keyof typeof patterns])}>
-                {Object.keys(patterns).map((pattern) => (
-                  <option key={pattern} value={pattern}>
-                    {pattern}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </label>
-        </div>
-        <div>
+      <Controls
+        cellSize={cellSize} setCellSize={setCellSize}
+        spacing={spacing} setSpacing={setSpacing}
+        spacingMode={spacingMode} setSpacingMode={setSpacingMode}
+        padding={padding} setPadding={setPadding}
+        preview={preview} setPreview={setPreview}
+        shape={shape} setShape={setShape}
+        invert={invert} setInvert={setInvert}
+        showNumbers={showNumbers} setShowNumbers={setShowNumbers}
+        symmetry={symmetry} setSymmetry={setSymmetry}
+        font={font} setFont={setFont}
+        composedGrid={composedGrid}
+        canvasRows={canvasRows} canvasCols={canvasCols}
+        activePart={activePart}
+        parts={parts} activePartId={activePartId} setActivePartId={setActivePartId}
+        addPart={addPart} removePart={removePart} renamePart={renamePart}
+        flipPartH={flipPartH} flipPartV={flipPartV}
+        updateActivePart={updateActivePart}
+        updateCanvas={updateCanvas}
+        textToGrid={textToGrid}
+      />
+      <div>
+        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+          <button onClick={undo} disabled={!canUndo}>undo</button>
+          <button onClick={redo} disabled={!canRedo}>redo</button>
+          <Toggle value={mode === "move"} onChange={(v) => setMode(v ? "move" : "draw")} labelOff="draw" labelOn="move" />
           <button
-            onClick={() =>
-              setGrid(
-                generatePerlinGrid(
-                  cols,
-                  rows,
-                  0.05 + Math.random() * 0.95,
-                  0.25 + Math.random() * 0.5,
-                ),
-              )
-            }
-          >
-            noise
-          </button>
-          <button
-            onClick={() =>
-              setGrid((prev) => {
-                return prev.map((row) =>
-                  row.map((cell) => (cell == -1 ? -1 : 0)),
-                );
-                // return Array(rows)
-                //   .fill(null)
-                //   .map(() =>
-                //     Array(cols)
-                //       .fill(null)
-                //       .map(() => 0)
-                //   );
-              })
-            }
+            onClick={() => updateCanvas((g) => g.map((row) => row.map(() => 0)))}
           >
             clear
           </button>
         </div>
-        <div style={{ display: "flex", padding: 0 }}>
-          <GridSize grid={grid} setGrid={setGrid} cellSize={cellSize} />
-          <div style={{ borderLeft: "1px solid orangered", padding: "0.5rem" }}>
-            <div>
-              <label>
-                <span>shape</span>
-                <div>
-                  <select
-                    value={shape}
-                    onChange={(e) => setShape(e.target.value as "square" | "circle" | "cross" | "star")}
-                  >
-                    {["square", "circle", "cross", "star"].map((shape) => (
-                      <option key={shape} value={shape}>
-                        {shape}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </label>
-            </div>
-            <div>
-              <label>
-                <span>invert</span>
-                <input
-                  type="checkbox"
-                  checked={invert}
-                  onChange={(e) => setInvert((prev) => !prev)}
-                />
-              </label>
-            </div>
-
-            <div>
-              <label>
-                <span>{preview ? "preview" : "cut lines"}</span>
-                <input
-                  type="checkbox"
-                  checked={preview}
-                  onChange={(e) => setPreview(e.target.checked)}
-                />
-              </label>
-            </div>
-          </div>
-        </div>{" "}
-        <div>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "0.5rem",
-            }}
-          >
-            <div>symmetry</div>
-            <label style={{ width: "2.5rem" }}>
-              x
-              <input
-                type="checkbox"
-                checked={symmetry.x}
-                onChange={(e) =>
-                  setSymmetry((prev) => ({ ...prev, x: !prev.x }))
-                }
-              />
-            </label>
-            <label style={{ width: "2.5rem" }}>
-              y
-              <input
-                type="checkbox"
-                checked={symmetry.y}
-                onChange={(e) =>
-                  setSymmetry((prev) => ({ ...prev, y: !prev.y }))
-                }
-              />
-            </label>
-            <label style={{ width: "2.5rem" }}>
-              z
-              <input
-                type="checkbox"
-                checked={symmetry.z}
-                onChange={(e) =>
-                  setSymmetry((prev) => ({ ...prev, z: !prev.z }))
-                }
-              />
-            </label>
-            <label style={{ width: "2.5rem" }}>
-              90°
-              <input
-                type="checkbox"
-                checked={symmetry.rotate90}
-                onChange={(e) =>
-                  setSymmetry((prev) => ({ ...prev, rotate90: !prev.rotate90 }))
-                }
-              />
-            </label>
-            <label style={{ width: "2.5rem" }}>
-              180°
-              <input
-                type="checkbox"
-                checked={symmetry.rotate180}
-                onChange={(e) =>
-                  setSymmetry((prev) => ({ ...prev, rotate180: !prev.rotate180 }))
-                }
-              />
-            </label>
-          </div>
-        </div>
-        <div>
-          <label>
-            <span>
-              Spacing <br /> {parseFloat((spacingPercent * 100).toFixed(1))}% /{" "}
-              {parseFloat(spacingPixels.toFixed(1))}
-              <span style={{ textTransform: "none" }}>px</span>
-            </span>
-
-            <div>
-              <select
-                value={spacingMode}
-                onChange={(e) => setSpacingMode(e.target.value)}
-              >
-                <option value="percent">Percent</option>
-                <option value="pixels">Pixels</option>
-              </select>
-            </div>
-            <div>
-              {spacingMode == "pixels" ? (
-                <input
-                  type="number"
-                  min="0"
-                  max={cellSize * 0.95}
-                  step={"0.5"}
-                  value={spacingPixels}
-                  onChange={(e) =>
-                    setSpacing(Number(e.target.value) / cellSize)
-                  }
-                />
-              ) : (
-                <input
-                  type="range"
-                  min="0"
-                  max={0.95}
-                  step={0.05}
-                  value={spacing}
-                  onChange={(e) => setSpacing(Number(e.target.value))}
-                />
-              )}
-            </div>
-          </label>
-        </div>
-        <div>
-          <label>
-            <span>border</span>
-            <input
-              type="range"
-              min="0"
-              max={0.5}
-              step={"0.1"}
-              value={padding}
-              onChange={(e) => setPadding(Number(e.target.value))}
-            />
-          </label>
-        </div>
-        <div>
-          <label>
-            <span>
-              Cell size <br />
-              {cellSize}
-              <span style={{ textTransform: "none" }}>px</span>
-            </span>
-            <div>
-              <input
-                type="number"
-                min="4"
-                value={cellSize}
-                onChange={(e) => setCellSize(Number(e.target.value))}
-              />
-            </div>
-            <div>
-              <input
-                type="range"
-                min="4"
-                max="40"
-                value={cellSize}
-                onChange={(e) => setCellSize(Number(e.target.value))}
-              />
-            </div>
-          </label>
-        </div>
-        <div>
-          <button
-            onClick={() =>
-              setGrid(
-                trimArrayWithBorder(grid, true, Math.ceil(Math.random() * 3)),
-              )
-            }
-            role="button"
-          >
-            Snap
-          </button>
-
-          <button
-            onClick={() => setGrid(trimArrayWithBorder(grid, false, 2))}
-            role="button"
-          >
-            Fill
-          </button>
-          <button
-            onClick={() => setGrid(trimArrayWithBorderRectangular(grid))}
-            role="button"
-          >
-            Square
-          </button>
-
-          <button
-            onClick={() => setGrid(trimArrayWithBorderCircular(grid))}
-            role="button"
-          >
-            Circle
-          </button>
-
-          {/* <button onClick={() => setGrid(destroyEdges(grid))} role="button">
-            Destroy edges
-          </button> */}
-
-          <button onClick={() => setGrid(shift(grid))} role="button">
-            Shift
-          </button>
-
-          <button onClick={() => setGrid(addSimpleBorder(grid))} role="button">
-            Simple border
-          </button>
-        </div>
-        <div>
-          <Download>
-            <Pattern
-              grid={grid}
-              cellSize={cellSize}
-              spacing={spacing}
-              padding={padding}
-              invert={invert}
-              shape={shape}
-              preview={false}
-            />
-          </Download>
-        </div>
-      </div>
-      <div>
-        <PatternCanvas
-          grid={grid}
+        <PatternCanvas          
+          grid={composedGrid}
+          shapeGrid={composedShape}
           cellSize={cellSize}
           spacing={spacing}
           padding={padding}
@@ -514,6 +307,13 @@ export default function App() {
           setSelected={setSelected}
           symmetry={symmetry}
           toggleCell={toggleCell}
+          showNumbers={showNumbers}
+          onStrokeStart={pushHistory}
+          activePart={activePart}
+          mode={mode}
+          parts={parts}
+          setActivePartId={setActivePartId}
+          movePart={movePart}
         />
       </div>
       <div
