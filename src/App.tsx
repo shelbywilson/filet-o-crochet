@@ -152,6 +152,15 @@ export default function App() {
     (id: string) => {
       pushHistory();
       setParts((prev) => {
+        // the first layer is never removed, just reset to a blank grid of the same size
+        if (prev[0]?.id === id) {
+          const first = prev[0];
+          const blank = first.grid.map((row) => row.map(() => 0));
+          return [
+            { ...first, name: "layer 1", source: "draw", grid: blank, offsetRow: 0, offsetCol: 0 },
+            ...prev.slice(1),
+          ];
+        }
         const next = prev.filter((p) => p.id !== id);
         if (activePartId === id && next.length > 0) {
           setActivePartId(next[next.length - 1].id);

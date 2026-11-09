@@ -182,7 +182,7 @@ export function Layers({
                 <button
                   onClick={(e) => { e.stopPropagation(); removePart(part.id); }}
                   style={{ fontSize: "0.7rem", flexShrink: 0 }}
-                  disabled={parts.length === 1}
+                  title={part.id === parts[0].id ? "Reset layer" : "Remove layer"}
                 >✕</button>
               </div>
             );
