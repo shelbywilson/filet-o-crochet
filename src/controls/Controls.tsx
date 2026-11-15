@@ -36,6 +36,7 @@ interface IControls {
   font: FontKey;
   setFont: (v: FontKey) => void;
   composedGrid: number[][];
+  exportGrid: number[][];
   canvasRows: number;
   canvasCols: number;
   activePart: Part | undefined;
@@ -64,6 +65,7 @@ export function Controls({
   symmetry, setSymmetry,
   font, setFont,
   composedGrid,
+  exportGrid,
   canvasRows, canvasCols,
   activePart,
   parts, activePartId, setActivePartId,
@@ -329,53 +331,66 @@ export function Controls({
         </button>
       </div>
       <div>
-        <button
-          onClick={() => {
-            const blob = new Blob([JSON.stringify(composedGrid)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "pattern.json";
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-        >
-          Save JSON
-        </button>
-        <label>
-          <span style={{ display: "inline-block" }} className="button">Load JSON</span>
-          <input
-            type="file"
-            accept=".json"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              const reader = new FileReader();
-              reader.onload = (ev) => {
-                try {
-                  const loaded = JSON.parse(ev.target?.result as string);
-                  addPart({ name: file.name.replace(".json", ""), source: "draw", grid: loaded, offsetRow: 0, offsetCol: 0 });
-                } catch {}
-              };
-              reader.readAsText(file);
-              e.target.value = "";
+        <div>
+          <button
+            onClick={() => {
+              const blob = new Blob([JSON.stringify(composedGrid)], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "pattern.json";
+              a.click();
+              URL.revokeObjectURL(url);
             }}
-          />
-        </label>
-      </div>
-      <div>
-        <Download>
-          <Pattern
-            grid={composedGrid}
-            cellSize={cellSize}
-            spacing={spacing}
-            padding={padding}
-            invert={invert}
-            shape={shape}
-            preview={false}
-          />
-        </Download>
+          >
+            Save JSON
+          </button>
+          <label style={{ display: "inline-flex" }}>
+            <span style={{ display: "inline-block" }} className="button">Load JSON</span>
+            <input
+              type="file"
+              accept=".json"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  try {
+                    const loaded = JSON.parse(ev.target?.result as string);
+                    addPart({ name: file.name.replace(".json", ""), source: "draw", grid: loaded, offsetRow: 0, offsetCol: 0 });
+                  } catch {}
+                };
+                reader.readAsText(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        <Download
+          cutLines={
+            <Pattern
+              grid={exportGrid}
+              cellSize={cellSize}
+              spacing={spacing}
+              padding={padding}
+              invert={invert}
+              shape={shape}
+              preview={false}
+            />
+          }
+          artwork={
+            <Pattern
+              grid={exportGrid}
+              cellSize={cellSize}
+              spacing={spacing}
+              padding={padding}
+              invert={invert}
+              shape={shape}
+              preview={true}
+            />
+          }
+        />
       </div>
     </div>
   );

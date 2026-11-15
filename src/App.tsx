@@ -71,6 +71,12 @@ export default function App() {
     [parts, canvasRows, canvasCols],
   );
 
+  // composed grid with cells outside the shape marked -1, for SVG exports
+  const exportGrid = useMemo(
+    () => composedGrid.map((row, r) => row.map((cell, c) => (composedShape[r]?.[c] === -1 ? -1 : cell))),
+    [composedGrid, composedShape],
+  );
+
   // --- History ---
   const partsRef = useRef(parts);
   partsRef.current = parts;
@@ -283,6 +289,7 @@ export default function App() {
         symmetry={symmetry} setSymmetry={setSymmetry}
         font={font} setFont={setFont}
         composedGrid={composedGrid}
+        exportGrid={exportGrid}
         canvasRows={canvasRows} canvasCols={canvasCols}
         activePart={activePart}
         parts={parts} activePartId={activePartId} setActivePartId={setActivePartId}

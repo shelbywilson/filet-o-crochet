@@ -115,11 +115,12 @@ export default function Cell({
                   r={(cellSize * (1 - spacing)) / 2}
                   fill={cell == 1 ? "#fff" : "rgb(40, 40, 40)"}
                 />
-              ) : shape == "cross" ? (
+              ) : shape == "cross" && cell != 1 ? (
                 getCross()
               ) : shape == "star" ? (
                 getStar(true)
               ) : (
+                // filled cells cover the whole cell (as on the canvas); empty ones are inset by the spacing
                 <rect
                   x={
                     colIndex * cellSize +
@@ -129,8 +130,8 @@ export default function Cell({
                     rowIndex * cellSize +
                     (cell == 0 ? (spacing * cellSize) / 2 : 0)
                   }
-                  width={cellSize - spacing * cellSize}
-                  height={cellSize - spacing * cellSize}
+                  width={cell == 1 ? cellSize : cellSize - spacing * cellSize}
+                  height={cell == 1 ? cellSize : cellSize - spacing * cellSize}
                   fill={cell == 1 ? "#fff" : "rgb(40, 40, 40)"}
                   stroke={"none"}
                   strokeWidth={0}

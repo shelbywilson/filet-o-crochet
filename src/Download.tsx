@@ -1,56 +1,37 @@
-import { downloadSVG } from "./util/download";
+import { ReactNode, useState } from "react";
+import { downloadArtwork, downloadCutLines } from "./util/download";
 
-// interface IDownload {
-//   grid: Array<Array<number>>;
-//   cellSize: number;
-//   spacing: number;
-//   invert: boolean;
-//   shape: "circle" | "square" | "cross";
-//   children: React.ReactElement;
-// }
+interface IDownload {
+  cutLines: ReactNode;
+  artwork: ReactNode;
+}
 
-export const Download = ({
-  children,
-}) => {
+export const Download = ({ cutLines, artwork }: IDownload) => {
+  const [showEmptyGrid, setShowEmptyGrid] = useState(true);
+
   return (
     <>
-      <button onClick={() => downloadSVG()} role="button">
-        Download SVG
-      </button>
+      <div>
+        <button onClick={downloadCutLines} role="button">
+          Download cut lines
+        </button>
+        <button onClick={() => downloadArtwork(showEmptyGrid)} role="button">
+          Download SVG
+        </button>
+      </div>
+      <label>
+        <span>show empty grid</span>
+        <input
+          type="checkbox"
+          checked={showEmptyGrid}
+          onChange={(e) => setShowEmptyGrid(e.target.checked)}
+        />
+      </label>
 
-      <div id={'export'} style={{ position: "absolute", left: "-9999px" }}>
-        {children}
-        {/* <svg
-          width={`${1 + cellSize * spacing + grid[0]?.length * cellSize}`}
-          height={`${1 + cellSize * spacing + grid.length * cellSize}`}
-          id="export"
-          shape-rendering="crispEdges"
-          vector-effect="non-scaling-stroke"
-        >
-          <path
-            d={addBorderPath(grid, spacing, cellSize)}
-            strokeWidth={1}
-            shape-rendering="crispEdges"
-            vector-effect="non-scaling-stroke"
-          ></path>
-          <g>
-            {grid.map((row, rowIndex) =>
-              row.map((cell, colIndex) => (
-                <Cell
-                  key={`${rowIndex}-${colIndex}`}
-                  rowIndex={rowIndex}
-                  colIndex={colIndex}
-                  cell={cell}
-                  cellSize={cellSize}
-                  spacing={spacing}
-                  preview={false}
-                  shape={shape}
-                  invert={invert}
-                />
-              ))
-            )}
-          </g>
-        </svg> */}
+      {/* off-screen renders that the buttons serialize */}
+      <div style={{ position: "absolute", left: "-9999px" }}>
+        <div id="export-cut-lines">{cutLines}</div>
+        <div id="export-artwork">{artwork}</div>
       </div>
     </>
   );
